@@ -1,12 +1,15 @@
 package ir.rahyab.hermes.adm.subscribersadmin.subscribersadmin;
 
 import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.web.client.RestTemplate;
 
 
-@SpringBootApplication
+/**
+ * The {@code SubscribersAdminApplication} class is the starting point of the Subscribers Admin system.
+ *
+ * @author tahbaz
+ */
 public class SubscribersAdminApplication {
 
 	public static void main(String[] args) {

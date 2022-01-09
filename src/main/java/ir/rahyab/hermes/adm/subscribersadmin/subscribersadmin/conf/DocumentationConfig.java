@@ -11,8 +11,11 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
+ * The {@code DocumentationConfig} class provides configuration for open api
+ *
  * @author tahbaz
  */
+
 @Configuration
 @ConditionalOnProperty(name = "springdoc.swagger-ui.enabled", havingValue = "true", matchIfMissing = true)
 public class DocumentationConfig {

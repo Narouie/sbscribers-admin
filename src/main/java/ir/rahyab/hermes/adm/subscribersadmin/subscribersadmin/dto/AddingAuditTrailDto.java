@@ -6,7 +6,7 @@ import java.io.Serializable;
 import java.time.LocalDateTime;
 
 /**
- * The {@code AddingAuditTrailDto} class , used for data transferring between {@code AuditTrailManagementSystem} and support user,
+ * The {@code AddingAuditTrailDto} class , used for data transferring between {@code AuditTrailManagementSystem} and Subscriber system,
  *
  * also used for saving changes about msisdn information's operations in audit trail management system
  *

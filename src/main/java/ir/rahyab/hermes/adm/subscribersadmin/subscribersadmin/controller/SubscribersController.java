@@ -3,6 +3,7 @@ package ir.rahyab.hermes.adm.subscribersadmin.subscribersadmin.controller;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import ir.rahyab.hermes.adm.subscribersadmin.subscribersadmin.dto.AddingAuditTrailDto;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -20,9 +21,18 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
+ * The {@code SubscribersController} class provides web methods to create consumers,get list of consumers and basic Auth,key Auth
+ * get list of credentials,acl,ip restrictions and get list of ip white list and rate limitting about {@code Consumer}
+ *
+ * Also, It includes saving the history of changes in the Audit Trail Management System.
+ *
+ * API specification in {@code SubscribersController} using OpenAPI.
+ *
  * @author tahbaz
  */
+
 @RestController
+@Tag(name = "Subscribers", description = "Endpoints for managing subscribers")
 public class SubscribersController {
 
     @Autowired
@@ -58,6 +68,20 @@ public class SubscribersController {
     @Autowired
     private RedisTemplate<Object, Object> redisTemplate;
 
+
+    /**
+     * Creates a new consumer in kong database(postgres database).
+     * Creates a new key in Redis database in the form of "ACT:" + username
+     * Response status codes include 201,204,409,404,400,500
+     * 201 status code:Created , 204 status code:Consumer does not create in database , 500 status code:Internal Server Error
+     * 409 status code:Consumer created before , 404 status code:Audit trail management path not found , 400 status code:Bad request
+     *
+     * @param username the {@code String} consumer or user of a service,The unique username of the Consumer. You must send either this field or custom_id with the request.
+     * @param custom_id the {@code String} Field for storing an existing unique ID for the Consumer - useful for mapping Kong with users in your existing database. You must send either this field or username with the request.
+     * @param refrence the {@code String} Refrence number for saving changes in postgres database by audit trail management system.
+     * @param description the {@code String} description for saving changes in postgres database by audit trail management system.
+     * @return status code the {@code ResponseEntity<String>} object representing 201,204,409,404,400,500
+     */
     @RequestMapping(value = {"/consumers"}, method = RequestMethod.POST,
             produces = {MediaType.APPLICATION_JSON_VALUE})
     @Operation(summary = "Create consumer", description = "Returns created consumer", operationId = "createConsumer")
@@ -114,6 +138,16 @@ public class SubscribersController {
         return null;
     }
 
+    /**
+     * Get consumer list, page by page.
+     * Response status codes include 200,500.
+     * 200 status code:Successful , 500 status code:Internal Server Error
+     *
+     * @param size the {@code Integer} size of each page.
+     * @param offset the {@code String} start of point for next page.
+     * @return status code the {@code ResponseEntity<String>} object representing 200,500
+     */
+
     @RequestMapping(value = {"/consumers"}, method = RequestMethod.GET,
             produces = {MediaType.APPLICATION_JSON_VALUE})
     @Operation(summary = "Get list of all consumers", description = "Returns list of all consumers", operationId = "getListAllConsumer")
@@ -137,9 +171,23 @@ public class SubscribersController {
         return response;
     }
 
+    /**
+     * Associate a basicAuth's credential to an existing Consumer object. A Consumer can have many credentials.
+     * Response status codes include 201,404,400,500
+     * 201 status code:Created , 500 status code:Internal Server Error ,
+     * 404 status code:Audit trail management path not found , 400 status code:Bad request
+     *
+     * @param consumer the {@code String} The id or username property of the Consumer entity to associate the credentials to.
+     * @param username the {@code String} The username to use in the basic authentication credential.
+     * @param password the {@code String} The password to use in the basic authentication credential.
+     * @param refrence the {@code String} Refrence number for saving changes in postgres database by audit trail management system.
+     * @param description the {@code String} description for saving changes in postgres database by audit trail management system.
+     * @return status code the {@code ResponseEntity<String>} object representing 201,404,400,500
+     */
+
     @RequestMapping(value = {"/consumers/{CONSUMER}/basic-auth"}, method = RequestMethod.POST,
             produces = {MediaType.APPLICATION_JSON_VALUE})
-    @Operation(summary = "Create information about consumer with username and password", description = "Create info about consumers with password", operationId = "basic-auth_consumer")
+    @Operation(summary = "Associate a credential to an existing Consumer object. A Consumer can have many credentials.", description = "Create basic authentication for existing consumer", operationId = "basic-auth_consumer")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "created"),
             @ApiResponse(responseCode = "404", description = "Audit trail management path not found"),
@@ -172,9 +220,20 @@ public class SubscribersController {
         return response;
     }
 
+    /**
+     * Retrieve basicAuth credentials associated with a consumer, page by page.
+     * Response status codes include 200,500.
+     * 200 status code:Successful , 500 status code:Internal Server Error
+     *
+     * @param usernameOrId the {@code String} The username or id of the consumer whose credentials need to be listed.
+     * @param size the {@code Integer} size of each page.
+     * @param offset the {@code String} start of point for next page.
+     * @return status code the {@code ResponseEntity<String>} object representing 200,500
+     */
+
     @RequestMapping(value = {"/consumers/{USERNAME_OR_ID}/basic-auth"}, method = RequestMethod.GET,
             produces = {MediaType.APPLICATION_JSON_VALUE})
-    @Operation(summary = "Get list of all credentials for username or id", description = "Returns list of all credentials for username or id", operationId = "basic-auth_usernameOrId")
+    @Operation(summary = "Retrieve basicAuth credentials associated with a consumer, page by page", description = "Returns list of all basicAuth associated with a consumer", operationId = "basic-auth_usernameOrId")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Successful"),
             @ApiResponse(responseCode = "500", description = "Internal Server Error")})
@@ -195,9 +254,21 @@ public class SubscribersController {
         return response;
     }
 
+    /**
+     * Associate a keyAuth's credential to an existing Consumer object.
+     * Response status codes include 201,404,400,500
+     * 201 status code:Created , 500 status code:Internal Server Error ,
+     * 404 status code:Audit trail management path not found , 400 status code:Bad request
+     *
+     * @param consumer the {@code String} The id or username property of the Consumer entity to associate the credentials to.
+     * @param refrence the {@code String} Refrence number for saving changes in postgres database by audit trail management system.
+     * @param description the {@code String} description for saving changes in postgres database by audit trail management system.
+     * @return status code the {@code ResponseEntity<String>} object representing 201,404,400,500
+     */
+
     @RequestMapping(value = {"/consumers/{consumer}/key-auth"}, method = RequestMethod.POST,
             produces = {MediaType.APPLICATION_JSON_VALUE})
-    @Operation(summary = "Create key information about consumer", description = "Create key info about consumer", operationId = "key-auth_consumer")
+    @Operation(summary = "Associate a credential to an existing Consumer object", description = "Associate a keyAuth's credential to an existing Consumer object", operationId = "key-auth_consumer")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "created"),
             @ApiResponse(responseCode = "404", description = "Audit trail management path not found"),
@@ -227,6 +298,17 @@ public class SubscribersController {
         return response;
     }
 
+    /**
+     * Retrieve key Auth credentials associated with a consumer, page by page.
+     * Response status codes include 200,500.
+     * 200 status code:Successful , 500 status code:Internal Server Error
+     *
+     * @param usernameOrId the {@code String} The username or id of the consumer whose credentials need to be listed.
+     * @param size the {@code Integer} size of each page.
+     * @param offset the {@code String} start of point for next page.
+     * @return status code the {@code ResponseEntity<String>} object representing 200,500
+     */
+
     @RequestMapping(value = {"/consumers/{usernameOrId}/key-auth"}, method = RequestMethod.GET,
             produces = {MediaType.APPLICATION_JSON_VALUE})
     @Operation(summary = "Get list of all credentials for username or id", description = "Returns list of all credentials for username or id", operationId = "key-auth_usernameOrId")
@@ -250,6 +332,18 @@ public class SubscribersController {
         return response;
     }
 
+    /**
+     * Restrict access to a Service or a Route by adding Consumers to allowed or denied lists using arbitrary ACL groups.
+     * Response status codes include 201,404,400,500
+     * 201 status code:Created , 500 status code:Internal Server Error ,
+     * 404 status code:Audit trail management path not found , 400 status code:Bad request
+     *
+     * @param consumer the {@code String} The username or id of the Consumer.
+     * @param group the {@code String} The arbitrary group name to associate with the consumer.
+     * @param refrence the {@code String} Refrence number for saving changes in postgres database by audit trail management system.
+     * @param description the {@code String} description for saving changes in postgres database by audit trail management system.
+     * @return status code the {@code ResponseEntity<String>} object representing 201,404,400,500
+     */
 
     @RequestMapping(value = {"/consumers/{CONSUMER}/acls"}, method = RequestMethod.POST,
             produces = {MediaType.APPLICATION_JSON_VALUE})
@@ -283,6 +377,19 @@ public class SubscribersController {
         }
         return response;
     }
+
+    /**
+     * Restrict access to a Service or a Route by either allowing or denying IP addresses.
+     * Response status codes include 201,404,400,500
+     * 201 status code:Created , 500 status code:Internal Server Error ,
+     * 404 status code:Audit trail management path not found , 400 status code:Bad request
+     *
+     * @param consumer the {@code String} The username or id of the Consumer.
+     * @param ipWhiteList the {@code String} The ip white list or allowed ip's.
+     * @param refrence the {@code String} Refrence number for saving changes in postgres database by audit trail management system.
+     * @param description the {@code String} description for saving changes in postgres database by audit trail management system.
+     * @return status code the {@code ResponseEntity<String>} object representing 201,404,400,500
+     */
 
     @RequestMapping(value = {"/consumers/{CONSUMER}/plugins"}, method = RequestMethod.POST,
             produces = {MediaType.APPLICATION_JSON_VALUE})
@@ -320,9 +427,20 @@ public class SubscribersController {
         return response;
     }
 
+    /**
+     * Retrieve allowed ip list for a consumer, page by page.
+     * Response status codes include 200,500.
+     * 200 status code:Successful , 500 status code:Internal Server Error
+     *
+     * @param usernameOrId the {@code String} The username or id of the consumer.
+     * @param size the {@code Integer} size of each page.
+     * @param offset the {@code String} start of point for next page.
+     * @return status code the {@code ResponseEntity<String>} object representing 200,500
+     */
+
     @RequestMapping(value = {"/consumers/{CONSUMER}/plugins"}, method = RequestMethod.GET,
             produces = {MediaType.APPLICATION_JSON_VALUE})
-    @Operation(summary = "Get list of all ip restrictions for consumer", description = "Returns list of all ip restrictions for consumer", operationId = "ip-restrictions")
+    @Operation(summary = "Get list of all ip white list for consumer", description = "Returns all allowed ip list for consumer", operationId = "ip-restrictions")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Successful"),
             @ApiResponse(responseCode = "500", description = "Internal Server Error")})
@@ -342,6 +460,21 @@ public class SubscribersController {
         }
         return response;
     }
+
+    /**
+     * Rate limit how many HTTP requests can be made in a given period of seconds, minutes, hours.
+     * Response status codes include 201,404,400,500
+     * 201 status code:Created , 500 status code:Internal Server Error ,
+     * 404 status code:Audit trail management path not found , 400 status code:Bad request
+     *
+     * @param consumer the {@code String} The username or id of the Consumer.
+     * @param second the {@code int} The number of HTTP requests that can be made per second.
+     * @param minute the {@code int} The number of HTTP requests that can be made per minute.
+     * @param hour the {@code int} The number of HTTP requests that can be made per hour.
+     * @param refrence the {@code String} Refrence number for saving changes in postgres database by audit trail management system.
+     * @param description the {@code String} description for saving changes in postgres database by audit trail management system.
+     * @return status code the {@code ResponseEntity<String>} object representing 201,404,400,500
+     */
 
     @RequestMapping(value = {"/consumers/{CONSUMER}/plugins_rate_limitting"}, method = RequestMethod.POST,
             produces = {MediaType.APPLICATION_JSON_VALUE})
