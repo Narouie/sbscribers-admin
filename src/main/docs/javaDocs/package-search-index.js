@@ -1,1 +1,0 @@
-packageSearchIndex = [{"l":"All Packages","url":"allpackages-index.html"},{"l":"ir.rahyab.hermes.adm.subscribersadmin.subscribersadmin"},{"l":"ir.rahyab.hermes.adm.subscribersadmin.subscribersadmin.conf"},{"l":"ir.rahyab.hermes.adm.subscribersadmin.subscribersadmin.controller"},{"l":"ir.rahyab.hermes.adm.subscribersadmin.subscribersadmin.dto"}]
