@@ -1,10 +1,12 @@
 package ir.rahyab.hermes.adm.subscribersadmin.subscribersadmin.controller;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import ir.rahyab.hermes.adm.subscribersadmin.subscribersadmin.dto.AddingAuditTrailDto;
+import ir.rahyab.hermes.adm.subscribersadmin.subscribersadmin.dto.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -174,9 +176,9 @@ public class SubscribersController {
 
     /**
      * Associate a basicAuth's credential to an existing subscriber object. A subscriber can have many credentials.
-     * Response status codes include 201,404,400,500
+     * Response status codes include 201,404,400,500,409
      * 201 status code:Created , 500 status code:Internal Server Error ,
-     * 404 status code:Audit trail management path not found , 400 status code:Bad request
+     * 404 status code:Audit trail management path not found , 400 status code:Bad request , 409 status code:Conflict
      *
      * @param subscriber  the {@code String} The id or username property of the subscriber entity to associate the credentials to.
      * @param username    the {@code String} The username to use in the basic authentication credential.
@@ -412,15 +414,15 @@ public class SubscribersController {
 
     /**
      * Restrict access to a Service or a Route by either allowing or denying IP addresses.
-     * Response status codes include 201,404,400,500
+     * Response status codes include 201,404,400,500,409
      * 201 status code:Created , 500 status code:Internal Server Error ,
-     * 404 status code:Audit trail management path not found , 400 status code:Bad request
+     * 404 status code:Audit trail management path not found , 400 status code:Bad request , 409 status code:Conflict
      *
      * @param subscriber  the {@code String} The username or id of the subscriber.
      * @param ipWhiteList the {@code String} The ip white list or allowed ip's.
      * @param reference   the {@code String} Refrence number for saving changes in postgres database by audit trail management system.
      * @param description the {@code String} description for saving changes in postgres database by audit trail management system.
-     * @return status code the {@code ResponseEntity<String>} object representing 201,404,400,500
+     * @return status code the {@code ResponseEntity<String>} object representing 201,404,400,500,409
      */
 
     @RequestMapping(value = {"/subscribers/{subscriber}/ip-restriction"}, method = RequestMethod.POST,
@@ -463,10 +465,66 @@ public class SubscribersController {
 
 
     /**
+     * Retrieve allowed ip list for a subscriber
+     * Response status codes include 200,500.
+     * 200 status code:Successful , 500 status code:Internal Server Error
+     *
+     * @param usernameOrId the {@code String} The username or id of the subscriber.
+     * @return status code the {@code ResponseEntity<String>} object representing 200,500
+     */
+
+    @RequestMapping(value = {"/subscribers/{subscriber}/ip-restriction"}, method = RequestMethod.GET,
+            produces = {MediaType.APPLICATION_JSON_VALUE})
+    @Operation(summary = "Get list of all ip white list for subscriber", description = "Returns list of all ip white list for subscriber", operationId = "ip-restrictions")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Successful"),
+            @ApiResponse(responseCode = "500", description = "Internal Server Error")})
+    public @ResponseBody
+    ResponseEntity<String> plugins(@RequestParam String usernameOrId) {
+        ResponseEntity<String> response = null;
+        ObjectMapper objectMapper = new ObjectMapper();
+
+        try {
+
+                response = restTemplate.getForEntity(plugins.replace("{CONSUMER}", usernameOrId) , String.class);
+
+                JsonDto jsonDto = objectMapper.readValue(response.getBody(), JsonDto.class);
+                for(RestrictionsDto restrictionsDto:jsonDto.getData()){
+                  if(restrictionsDto.getName().equals("ip-restriction")){
+                      IpRestrictionDto ipRestrictionDto = new IpRestrictionDto();
+                      IpConfigDto ipConfigDto = new IpConfigDto();
+                      ipRestrictionDto.setConsumer(restrictionsDto.getConsumer());
+                      ipRestrictionDto.setService(restrictionsDto.getService());
+                      ipRestrictionDto.setRoute(restrictionsDto.getRoute());
+                      ipRestrictionDto.setTags(restrictionsDto.getTags());
+                      ipRestrictionDto.setCreated_at(restrictionsDto.getCreated_at());
+                      ipRestrictionDto.setEnabled(restrictionsDto.isEnabled());
+                      ipRestrictionDto.setId(restrictionsDto.getId());
+                      ipRestrictionDto.setName(restrictionsDto.getName());
+                      ipRestrictionDto.setProtocols(restrictionsDto.getProtocols());
+                      ipConfigDto.setStatus(restrictionsDto.getConfig().getStatus());
+                      ipConfigDto.setMessage(restrictionsDto.getConfig().getMessage());
+                      ipConfigDto.setDeny(restrictionsDto.getConfig().getDeny());
+                      ipConfigDto.setAllow(restrictionsDto.getConfig().getAllow());
+                      ipRestrictionDto.setConfig(ipConfigDto);
+                      response = new ResponseEntity<>(objectMapper.writeValueAsString(ipRestrictionDto),HttpStatus.OK);
+                  }
+                }
+
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+        return response;
+    }
+
+
+    /**
      * Rate limit how many HTTP requests can be made in a given period of seconds, minutes, hours.
-     * Response status codes include 201,404,400,500
+     * Response status codes include 201,404,400,500,409
      * 201 status code:Created , 500 status code:Internal Server Error ,
-     * 404 status code:Audit trail management path not found , 400 status code:Bad request
+     * 404 status code:Audit trail management path not found , 400 status code:Bad request , 409 status code:Conflict
      *
      * @param subscriber  the {@code String} The username or id of the subscriber.
      * @param second      the {@code int} The number of HTTP requests that can be made per second.
@@ -484,6 +542,7 @@ public class SubscribersController {
             @ApiResponse(responseCode = "201", description = "created"),
             @ApiResponse(responseCode = "404", description = "Audit trail management path not found"),
             @ApiResponse(responseCode = "400", description = "Bad request"),
+            @ApiResponse(responseCode = "409", description = "Conflict"),
             @ApiResponse(responseCode = "500", description = "Internal Server Error")})
     public @ResponseBody
     ResponseEntity<String> plugins(@RequestParam String subscriber, @RequestParam int second, @RequestParam int minute, @RequestParam int hour, @RequestParam String reference, @RequestParam String description) {
@@ -502,6 +561,8 @@ public class SubscribersController {
             }
 
         } catch (org.springframework.web.client.HttpClientErrorException exception) {
+            if (exception.getStatusCode().value() == 409)
+                return new ResponseEntity<>(exception.getMessage(), HttpStatus.CONFLICT);
             if (exception.getStatusCode().value() == 404)
                 return new ResponseEntity<>(HttpStatus.NOT_FOUND);
             if (exception.getStatusCode().value() == 400)
@@ -512,6 +573,60 @@ public class SubscribersController {
         }
         return response;
     }
+
+    /**
+     * Retrieve allowed ip list for a subscriber
+     * Response status codes include 200,500.
+     * 200 status code:Successful , 500 status code:Internal Server Error
+     *
+     * @param usernameOrId the {@code String} The username or id of the subscriber.
+     * @return status code the {@code ResponseEntity<String>} object representing 200,500
+     */
+
+    @RequestMapping(value = {"/subscribers/{subscriber}/rate-limiting"}, method = RequestMethod.GET,
+            produces = {MediaType.APPLICATION_JSON_VALUE})
+    @Operation(summary = "Get rate limiting for subscriber", description = "Returns rate limiting for subscriber", operationId = "rate-limiting")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Successful"),
+            @ApiResponse(responseCode = "500", description = "Internal Server Error")})
+    public @ResponseBody
+    ResponseEntity<String> rateLimiting(@RequestParam String usernameOrId) {
+        ResponseEntity<String> response = null;
+        ObjectMapper objectMapper = new ObjectMapper();
+
+        try {
+
+            response = restTemplate.getForEntity(plugins.replace("{CONSUMER}", usernameOrId) , String.class);
+
+            JsonDto jsonDto = objectMapper.readValue(response.getBody(), JsonDto.class);
+            for(RestrictionsDto restrictionsDto:jsonDto.getData()){
+                if(restrictionsDto.getName().equals("rate-limiting")){
+                    RateLimitingDto rateLimitingDto = new RateLimitingDto();
+                    RateConfigDto rateConfigDto = new RateConfigDto();
+                    rateLimitingDto.setConsumer(restrictionsDto.getConsumer());
+                    rateLimitingDto.setService(restrictionsDto.getService());
+                    rateLimitingDto.setRoute(restrictionsDto.getRoute());
+                    rateLimitingDto.setTags(restrictionsDto.getTags());
+                    rateLimitingDto.setCreated_at(restrictionsDto.getCreated_at());
+                    rateLimitingDto.setEnabled(restrictionsDto.isEnabled());
+                    rateLimitingDto.setId(restrictionsDto.getId());
+                    rateLimitingDto.setName(restrictionsDto.getName());
+                    rateLimitingDto.setProtocols(restrictionsDto.getProtocols());
+                    rateConfigDto.setSecond(restrictionsDto.getConfig().getSecond());
+                    rateConfigDto.setMinute(restrictionsDto.getConfig().getMinute());
+                    rateConfigDto.setHour(restrictionsDto.getConfig().getHour());
+                    rateLimitingDto.setConfig(rateConfigDto);
+                    response = new ResponseEntity<>(objectMapper.writeValueAsString(rateLimitingDto),HttpStatus.OK);
+                }
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+        return response;
+    }
+
 
     private ResponseEntity<String> subscribersChanges(String reference, String description, String auditResource, String auditAction /*, HttpServletRequest request*/) {
         ResponseEntity<String> changes = null;
