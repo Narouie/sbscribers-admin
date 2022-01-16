@@ -2,11 +2,14 @@ package ir.rahyab.hermes.adm.subscribersadmin.subscribersadmin.controller;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.lettuce.core.ScriptOutputType;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import ir.rahyab.hermes.adm.subscribersadmin.subscribersadmin.dto.*;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -16,11 +19,10 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
 
+import javax.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
-import java.util.Arrays;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
 
 /**
  * The {@code SubscribersController} class provides web methods to create subscribers,get list of subscribers and basic Auth,key Auth
@@ -36,6 +38,7 @@ import java.util.UUID;
 @RestController
 @Tag(name = "Subscribers", description = "Endpoints for managing subscribers")
 public class SubscribersController {
+    private static final Logger logger = LogManager.getLogger(SubscribersController.class);
 
     @Autowired
     RestTemplate restTemplate;
@@ -98,7 +101,7 @@ public class SubscribersController {
             @ApiResponse(responseCode = "400", description = "Bad request"),
             @ApiResponse(responseCode = "500", description = "Internal Server Error")})
     public @ResponseBody
-    ResponseEntity<String> subscribers(@RequestParam String username, @RequestParam String custom_id, @RequestParam String reference, @RequestParam String description) {
+    ResponseEntity<String> subscribers(@RequestParam String username, @RequestParam String custom_id, @RequestParam String reference, @RequestParam String description, HttpServletRequest request) {
 
         var operations = redisTemplate.opsForHash();
 
@@ -119,7 +122,7 @@ public class SubscribersController {
                     if (!redisTemplate.hasKey(endUserId)) {
                         operations.put(endUserId, "created_at", String.valueOf(LocalDateTime.now().toEpochSecond(ZoneOffset.UTC)));
 
-                        ResponseEntity<String> audit = subscribersChanges(reference, description, username, "create_subscriber");
+                        ResponseEntity<String> audit = subscribersChanges(reference, description, username, "create_subscriber",request);
 
                         return response;
                     }
@@ -142,6 +145,20 @@ public class SubscribersController {
         return null;
     }
 
+    private Map<String, String> getHeadersInfo(HttpServletRequest request) {
+
+        Map<String, String> map = new HashMap<String, String>();
+
+        Enumeration headerNames = request.getHeaderNames();
+        while (headerNames.hasMoreElements()) {
+            String key = (String) headerNames.nextElement();
+            String value = request.getHeader(key);
+            map.put(key, value);
+        }
+
+        return map;
+    }
+
     /**
      * Get subscriber list, page by page.
      * Response status codes include 200,500.
@@ -159,8 +176,10 @@ public class SubscribersController {
             @ApiResponse(responseCode = "200", description = "Successful"),
             @ApiResponse(responseCode = "500", description = "Internal Server Error")})
     public @ResponseBody
-    ResponseEntity<String> subscribers(@RequestParam(defaultValue = "3") Integer size, @RequestParam(required = false) String offset) {
+    ResponseEntity<String> subscribers(@RequestParam(defaultValue = "3") Integer size, @RequestParam(required = false) String offset, HttpServletRequest request) {
         ResponseEntity<String> response = null;
+
+            logger.info("request.getHeaderNames() : " + getHeadersInfo(request));
 
         try {
             if (offset == null || offset.isEmpty()) {
@@ -198,7 +217,7 @@ public class SubscribersController {
             @ApiResponse(responseCode = "409", description = "Conflict"),
             @ApiResponse(responseCode = "500", description = "Internal Server Error")})
     public @ResponseBody
-    ResponseEntity<String> basicAuth(@RequestParam String subscriber, @RequestParam String username, @RequestParam String password, @RequestParam String reference, @RequestParam String description) {
+    ResponseEntity<String> basicAuth(@RequestParam String subscriber, @RequestParam String username, @RequestParam String password, @RequestParam String reference, @RequestParam String description, HttpServletRequest request) {
 
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<String, Object>();
         body.add("username", username);
@@ -208,7 +227,7 @@ public class SubscribersController {
 
             response = restTemplate.postForEntity(basicAuthUrl_c.replace("{CONSUMER}", subscriber), new HttpEntity<>(body), String.class);
             if (response.getStatusCodeValue() == 201) {
-                subscribersChanges(reference, description, subscriber, "create_basicAuth");
+                subscribersChanges(reference, description, subscriber, "create_basicAuth", request);
             }
 
         } catch (org.springframework.web.client.HttpClientErrorException exception) {
@@ -280,14 +299,14 @@ public class SubscribersController {
             @ApiResponse(responseCode = "400", description = "Bad request"),
             @ApiResponse(responseCode = "500", description = "Internal Server Error")})
     public @ResponseBody
-    ResponseEntity<String> keyAuth(@RequestParam String subscriber, @RequestParam String reference, @RequestParam String description) {
+    ResponseEntity<String> keyAuth(@RequestParam String subscriber, @RequestParam String reference, @RequestParam String description, HttpServletRequest request) {
 
         ResponseEntity<String> response = null;
         try {
 
             response = restTemplate.postForEntity(keyAuthUrl_c.replace("{consumer}", subscriber), null, String.class);
             if (response.getStatusCodeValue() == 201) {
-                subscribersChanges(reference, description, subscriber, "create_keyAuth");
+                subscribersChanges(reference, description, subscriber, "create_keyAuth",request);
             }
 
         } catch (org.springframework.web.client.HttpClientErrorException exception) {
@@ -389,7 +408,7 @@ public class SubscribersController {
             @ApiResponse(responseCode = "400", description = "Bad request"),
             @ApiResponse(responseCode = "500", description = "Internal Server Error")})
     public @ResponseBody
-    ResponseEntity<String> acls(@RequestParam String subscriber, @RequestParam String group, @RequestParam String reference, @RequestParam String description) {
+    ResponseEntity<String> acls(@RequestParam String subscriber, @RequestParam String group, @RequestParam String reference, @RequestParam String description, HttpServletRequest request) {
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<String, Object>();
         body.add("group", group);
         ResponseEntity<String> response = null;
@@ -397,7 +416,7 @@ public class SubscribersController {
 
             response = restTemplate.postForEntity(aclsUrl.replace("{CONSUMER}", subscriber), new HttpEntity<>(body), String.class);
             if (response.getStatusCodeValue() == 201) {
-                subscribersChanges(reference, description, subscriber, "create_acl");
+                subscribersChanges(reference, description, subscriber, "create_acl", request);
             }
 
         } catch (org.springframework.web.client.HttpClientErrorException exception) {
@@ -435,7 +454,7 @@ public class SubscribersController {
             @ApiResponse(responseCode = "409", description = "Conflict"),
             @ApiResponse(responseCode = "500", description = "Internal Server Error")})
     public @ResponseBody
-    ResponseEntity<String> plugins(@RequestParam String subscriber, @RequestParam String ipWhiteList, @RequestParam String reference, @RequestParam String description) {
+    ResponseEntity<String> plugins(@RequestParam String subscriber, @RequestParam String ipWhiteList, @RequestParam String reference, @RequestParam String description, HttpServletRequest request) {
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<String, Object>();
         body.add("name", "ip-restriction");
         String[] ips = ipWhiteList.split(",");
@@ -446,7 +465,7 @@ public class SubscribersController {
 
             response = restTemplate.postForEntity(plugins.replace("{CONSUMER}", subscriber), new HttpEntity<>(body), String.class);
             if (response.getStatusCodeValue() == 201) {
-                subscribersChanges(reference, description, subscriber, "create_ipRestriction");
+                subscribersChanges(reference, description, subscriber, "create_ipRestriction", request);
             }
 
         } catch (org.springframework.web.client.HttpClientErrorException exception) {
@@ -545,7 +564,7 @@ public class SubscribersController {
             @ApiResponse(responseCode = "409", description = "Conflict"),
             @ApiResponse(responseCode = "500", description = "Internal Server Error")})
     public @ResponseBody
-    ResponseEntity<String> plugins(@RequestParam String subscriber, @RequestParam int second, @RequestParam int minute, @RequestParam int hour, @RequestParam String reference, @RequestParam String description) {
+    ResponseEntity<String> plugins(@RequestParam String subscriber, @RequestParam int second, @RequestParam int minute, @RequestParam int hour, @RequestParam String reference, @RequestParam String description, HttpServletRequest request) {
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<String, Object>();
         body.add("name", "rate-limiting");
         body.add("config.second", second);
@@ -557,7 +576,7 @@ public class SubscribersController {
 
             response = restTemplate.postForEntity(plugins.replace("{CONSUMER}", subscriber), new HttpEntity<>(body), String.class);
             if (response.getStatusCodeValue() == 201) {
-                subscribersChanges(reference, description, subscriber, "create_RateLimitting");
+                subscribersChanges(reference, description, subscriber, "create_RateLimitting", request);
             }
 
         } catch (org.springframework.web.client.HttpClientErrorException exception) {
@@ -628,7 +647,7 @@ public class SubscribersController {
     }
 
 
-    private ResponseEntity<String> subscribersChanges(String reference, String description, String auditResource, String auditAction /*, HttpServletRequest request*/) {
+    private ResponseEntity<String> subscribersChanges(String reference, String description, String auditResource, String auditAction, HttpServletRequest request) {
         ResponseEntity<String> changes = null;
         try {
             HttpHeaders headers = new HttpHeaders();
@@ -636,7 +655,7 @@ public class SubscribersController {
             AddingAuditTrailDto addingAuditTrailDto = new AddingAuditTrailDto();
             addingAuditTrailDto.setAuditAction(auditAction);
             addingAuditTrailDto.setAuditResource(auditResource);
-            addingAuditTrailDto.setAuditUser("subscribers-admin-user");
+            addingAuditTrailDto.setAuditUser(request.getHeader("x-consumer-username"));
             addingAuditTrailDto.setApplicCd(auditTrailApplicCd);
             addingAuditTrailDto.setRefrence(reference);
             addingAuditTrailDto.setDescription(description);
