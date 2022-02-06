@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import ir.rahyab.hermes.adm.subscribersadmin.subscribersadmin.dto.*;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,6 +18,7 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
 import javax.servlet.http.HttpServletRequest;
+import java.net.URI;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Arrays;
@@ -46,20 +48,27 @@ public class SubscribersController {
     @Value("${subscribersAdmin.subscribers.url}")
     private String subscribersUrl;
 
-    @Value("${subscribersAdmin.subscribers.basic-auth.url}")
-    private String basicAuthUrl_c;
+    @Value("${subscribersAdmin.post.basic-auth.url}")
+    private String basicAuthUrl_post;
 
-    @Value("${subscribersAdmin.usernameOrId.basic-auth.url}")
-    private String basicAuthUrl_u;
+    @Value("${subscribersAdmin.get.basic-auth.url}")
+    private String basicAuthUrl_get;
 
-    @Value("${subscribersAdmin.subscribers.key-auth.url}")
-    private String keyAuthUrl_c;
+    @Value("${subscribersAdmin.delete.basic-auth.url}")
+    private String basicAuthUrl_del;
 
-    @Value("${subscribersAdmin.usernameOrId.key-auth.url}")
-    private String keyAuthUrl_u;
 
-    @Value("${subscribersAdmin.keyOrId.key-auth.url}")
-    private String keyAuthUrl_k;
+    @Value("${subscribersAdmin.post.key-auth.url}")
+    private String keyAuthUrl_post;
+
+    @Value("${subscribersAdmin.getkey.key-auth.url}")
+    private String keyAuthUrl_getkey;
+
+    @Value("${subscribersAdmin.getsubscriber.key-auth.url}")
+    private String keyAuthUrl_getsubscriber;
+
+    @Value("${subscribersAdmin.delete.key-auth.url}")
+    private String keyAuthUrl_del;
 
     @Value("${subscribersAdmin.acls.url}")
     private String aclsUrl;
@@ -82,11 +91,11 @@ public class SubscribersController {
      * Creates a new key in Redis database in the form of "ACT:" + username
      * Response status codes include 201,204,409,404,400,500
      * 201 status code:Created , 204 status code:subscriber does not create in database , 500 status code:Internal Server Error
-     * 409 status code:subscriber created before , 404 status code:Audit trail management path not found , 400 status code:Bad request
+     * 409 status code:subscriber created before , 404 status code:Not found , 400 status code:Bad request
      *
      * @param username    the {@code String} subscriber or user of a service,The unique username of the subscriber. You must send either this field or custom_id with the request.
      * @param custom_id   the {@code String} Field for storing an existing unique ID for the subscriber - useful for mapping Kong with users in your existing database. You must send either this field or username with the request.
-     * @param reference   the {@code String} Refrence number for saving changes in postgres database by audit trail management system.
+     * @param reference   the {@code String} Reference number for saving changes in postgres database by audit trail management system.
      * @param description the {@code String} description for saving changes in postgres database by audit trail management system.
      * @return status code the {@code ResponseEntity<String>} object representing 201,204,409,404,400,500
      */
@@ -97,7 +106,7 @@ public class SubscribersController {
             @ApiResponse(responseCode = "201", description = "created"),
             @ApiResponse(responseCode = "204", description = "No content"),
             @ApiResponse(responseCode = "409", description = "subscriber created before"),
-            @ApiResponse(responseCode = "404", description = "Audit trail management path not found"),
+            @ApiResponse(responseCode = "404", description = "Not found"),
             @ApiResponse(responseCode = "400", description = "Bad request"),
             @ApiResponse(responseCode = "500", description = "Internal Server Error")})
     public @ResponseBody
@@ -198,23 +207,23 @@ public class SubscribersController {
      * Associate a basicAuth's credential to an existing subscriber object. A subscriber can have many credentials.
      * Response status codes include 201,204,404,400,500,409
      * 201 status code:Created , 204 status code:No content , 500 status code:Internal Server Error ,
-     * 404 status code:Audit trail management path not found , 400 status code:Bad request , 409 status code:Conflict
+     * 404 status code:Not found , 400 status code:Bad request , 409 status code:Conflict
      *
      * @param subscriber  the {@code String} The id or username property of the subscriber entity to associate the credentials to.
      * @param username    the {@code String} The username to use in the basic authentication credential.
      * @param password    the {@code String} The password to use in the basic authentication credential.
-     * @param reference   the {@code String} Refrence number for saving changes in postgres database by audit trail management system.
+     * @param reference   the {@code String} Reference number for saving changes in postgres database by audit trail management system.
      * @param description the {@code String} description for saving changes in postgres database by audit trail management system.
      * @return status code the {@code ResponseEntity<String>} object representing 201,404,400,500
      */
 
-    @RequestMapping(value = {"/subscribers/{subscriber}/basic-auth"}, method = RequestMethod.POST,
+    @RequestMapping(value = {"/subscribers/basic-auth"}, method = RequestMethod.POST,
             produces = {MediaType.APPLICATION_JSON_VALUE})
     @Operation(summary = "Associate a credential to an existing subscriber object. A subscriber can have many credentials.", description = "Create basic authentication for existing subscriber", operationId = "basic-auth_subscriber")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "created"),
             @ApiResponse(responseCode = "204", description = "No content"),
-            @ApiResponse(responseCode = "404", description = "Audit trail management path not found"),
+            @ApiResponse(responseCode = "404", description = "Not found"),
             @ApiResponse(responseCode = "400", description = "Bad request"),
             @ApiResponse(responseCode = "409", description = "Conflict"),
             @ApiResponse(responseCode = "500", description = "Internal Server Error")})
@@ -227,7 +236,7 @@ public class SubscribersController {
         ResponseEntity<String> response = null;
         try {
 
-            response = restTemplate.postForEntity(basicAuthUrl_c.replace("{CONSUMER}", subscriber), new HttpEntity<>(body), String.class);
+            response = restTemplate.postForEntity(basicAuthUrl_post.replace("{CONSUMER}", subscriber), new HttpEntity<>(body), String.class);
             if (response.getStatusCodeValue() == 201) {
                 subscribersChanges(reference, description, subscriber, "create_basicAuth", request);
             }else {
@@ -245,7 +254,7 @@ public class SubscribersController {
             e.printStackTrace();
             return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
         }
-         //return ResponseEntity.accepted().body(response.getBody());
+
         return  response;
     }
 
@@ -260,7 +269,7 @@ public class SubscribersController {
      * @return status code the {@code ResponseEntity<String>} object representing 200,500
      */
 
-    @RequestMapping(value = {"/subscribers/{usernameOrId}/basic-auth"}, method = RequestMethod.GET,
+    @RequestMapping(value = {"/subscribers/basic-auth"}, method = RequestMethod.GET,
             produces = {MediaType.APPLICATION_JSON_VALUE})
     @Operation(summary = "Retrieve basicAuth credentials associated with a subscriber, page by page", description = "Returns list of all basicAuth associated with a subscriber", operationId = "basic-auth_usernameOrId")
     @ApiResponses(value = {
@@ -272,9 +281,9 @@ public class SubscribersController {
 
         try {
             if (offset == null || offset.isEmpty()) {
-                response = restTemplate.getForEntity(basicAuthUrl_u.replace("{USERNAME_OR_ID}", usernameOrId) + "?size=" + size, String.class);
+                response = restTemplate.getForEntity(basicAuthUrl_get.replace("{USERNAME_OR_ID}", usernameOrId) + "?size=" + size, String.class);
             } else
-                response = restTemplate.getForEntity(basicAuthUrl_u.replace("{USERNAME_OR_ID}", usernameOrId) + "?size=" + size + "&offset=" + offset, String.class);
+                response = restTemplate.getForEntity(basicAuthUrl_get.replace("{USERNAME_OR_ID}", usernameOrId) + "?size=" + size + "&offset=" + offset, String.class);
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -284,24 +293,69 @@ public class SubscribersController {
     }
 
     /**
-     * Associate a keyAuth's credential to an existing subscriber object.
-     * Response status codes include 201,204,404,400,500
-     * 201 status code:Created , 204 status code: No content , 500 status code:Internal Server Error ,
-     * 404 status code:Audit trail management path not found , 400 status code:Bad request
+     * Delete a basicAuth's credential from an existing subscriber object.
+     * Response status codes include 204,404,400,500
+     * 204 status code:No Content , 500 status code:Internal Server Error
+     * 404 status code:Not found , 400 status code:Bad request
      *
      * @param subscriber  the {@code String} The id or username property of the subscriber entity to associate the credentials to.
-     * @param reference   the {@code String} Refrence number for saving changes in postgres database by audit trail management system.
+     * @param username    the {@code String} The username to use in the basic authentication credential.
+     * @param reference   the {@code String} Reference number for saving changes in postgres database by audit trail management system.
      * @param description the {@code String} description for saving changes in postgres database by audit trail management system.
      * @return status code the {@code ResponseEntity<String>} object representing 201,404,400,500
      */
 
-    @RequestMapping(value = {"/subscribers/{subscriber}/key-auth"}, method = RequestMethod.POST,
+    @RequestMapping(value = {"/subscribers/basic-auth"}, method = RequestMethod.DELETE,
+            produces = {MediaType.APPLICATION_JSON_VALUE})
+    @Operation(summary = "Delete a credential from an existing subscriber object. A subscriber can have many credentials.", description = "Delete basic authentication for existing subscriber", operationId = "basic-auth_del")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "204", description = "No Content"),
+            @ApiResponse(responseCode = "404", description = "Not found"),
+            @ApiResponse(responseCode = "400", description = "Bad request"),
+            @ApiResponse(responseCode = "500", description = "Internal Server Error")})
+    public @ResponseBody
+    ResponseEntity<String> basicAuth(@RequestParam String subscriber, @RequestParam String username, @RequestParam String reference, @RequestParam String description, HttpServletRequest request) {
+        ResponseEntity<String> response = null;
+        try {
+            String url1 = basicAuthUrl_del.replace("{CONSUMER}",subscriber);
+            String url2 =url1.replace("{USERNAME}",username);
+            restTemplate.delete(new URI(url2));
+            subscribersChanges(reference, description, subscriber, "deleteBasicAuth", request);
+            response=new ResponseEntity<>(HttpStatus.NO_CONTENT);
+
+        } catch (org.springframework.web.client.HttpClientErrorException exception) {
+            if (exception.getStatusCode().value() == 404)
+                return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+            if (exception.getStatusCode().value() == 400)
+                return new ResponseEntity<>(exception.getMessage(), HttpStatus.BAD_REQUEST);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+
+        return response;
+    }
+
+
+    /**
+     * Associate a keyAuth's credential to an existing subscriber object.
+     * Response status codes include 201,204,404,400,500
+     * 201 status code:Created , 204 status code: No content , 500 status code:Internal Server Error ,
+     * 404 status code:Not found , 400 status code:Bad request
+     *
+     * @param subscriber  the {@code String} The id or username property of the subscriber entity to associate the credentials to.
+     * @param reference   the {@code String} Reference number for saving changes in postgres database by audit trail management system.
+     * @param description the {@code String} description for saving changes in postgres database by audit trail management system.
+     * @return status code the {@code ResponseEntity<String>} object representing 201,404,400,500
+     */
+
+    @RequestMapping(value = {"/subscribers/key-auth"}, method = RequestMethod.POST,
             produces = {MediaType.APPLICATION_JSON_VALUE})
     @Operation(summary = "Associate a credential to an existing subscriber object", description = "Associate a keyAuth's credential to an existing subscriber object", operationId = "key-auth_subscriber")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "created"),
             @ApiResponse(responseCode = "204", description = "No content"),
-            @ApiResponse(responseCode = "404", description = "Audit trail management path not found"),
+            @ApiResponse(responseCode = "404", description = "Not found"),
             @ApiResponse(responseCode = "400", description = "Bad request"),
             @ApiResponse(responseCode = "500", description = "Internal Server Error")})
     public @ResponseBody
@@ -310,7 +364,7 @@ public class SubscribersController {
         ResponseEntity<String> response = null;
         try {
 
-            response = restTemplate.postForEntity(keyAuthUrl_c.replace("{consumer}", subscriber), null, String.class);
+            response = restTemplate.postForEntity(keyAuthUrl_post.replace("{consumer}", subscriber), null, String.class);
             if (response.getStatusCodeValue() == 201) {
                 subscribersChanges(reference, description, subscriber, "create_keyAuth", request);
             }else {
@@ -341,7 +395,7 @@ public class SubscribersController {
      * @return status code the {@code ResponseEntity<String>} object representing 200,500
      */
 
-    @RequestMapping(value = {"/subscribers/{usernameOrId}/key-auth"}, method = RequestMethod.GET,
+    @RequestMapping(value = {"/subscribers/key-auth"}, method = RequestMethod.GET,
             produces = {MediaType.APPLICATION_JSON_VALUE})
     @Operation(summary = "Get list of all credentials for username or id", description = "Returns list of all credentials for username or id", operationId = "key-auth_usernameOrId")
     @ApiResponses(value = {
@@ -353,10 +407,52 @@ public class SubscribersController {
 
         try {
             if (offset == null || offset.isEmpty()) {
-                response = restTemplate.getForEntity(keyAuthUrl_u.replace("{usernameOrId}", usernameOrId) + "?size=" + size, String.class);
+                response = restTemplate.getForEntity(keyAuthUrl_getkey.replace("{usernameOrId}", usernameOrId) + "?size=" + size, String.class);
             } else
-                response = restTemplate.getForEntity(keyAuthUrl_u.replace("{usernameOrId}", usernameOrId) + "?size=" + size + "&offset=" + offset, String.class);
+                response = restTemplate.getForEntity(keyAuthUrl_getkey.replace("{usernameOrId}", usernameOrId) + "?size=" + size + "&offset=" + offset, String.class);
 
+        } catch (Exception e) {
+            e.printStackTrace();
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+        return response;
+    }
+
+    /**
+     * Delete an API Key.
+     * Response status codes include 204,500,400,404.
+     * 204 status code:No Content , 500 status code:Internal Server Error
+     * 404 status code:Not found , 400 status code:Bad request
+     *
+     * @param subscriber the {@code String} The id or username property of the Consumer entity to associate the credentials to.
+     * @param id       the {@code String} The id attribute of the key credential object.
+     * @return status code the {@code ResponseEntity<String>} object representing 204,500
+     */
+
+    @RequestMapping(value = {"/subscribers/key-auth"}, method = RequestMethod.DELETE,
+            produces = {MediaType.APPLICATION_JSON_VALUE})
+    @Operation(summary = "Delete an API Key", description = "Delete an API Key", operationId = "key-auth_del")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "204", description = "No Content"),
+            @ApiResponse(responseCode = "404", description = "Not found"),
+            @ApiResponse(responseCode = "400", description = "Bad request"),
+            @ApiResponse(responseCode = "500", description = "Internal Server Error")})
+    public @ResponseBody
+    ResponseEntity<String> keyAuth(@RequestParam String subscriber, @RequestParam String id, @RequestParam String reference, @RequestParam String description, HttpServletRequest request) {
+        ResponseEntity<String> response = null;
+
+        try {
+                String url1 = keyAuthUrl_del.replace("{consumer}",subscriber);
+                String url2 =url1.replace("{id}",id);
+                restTemplate.delete(new URI(url2));
+                subscribersChanges(reference, description, subscriber, "deleteKeyAuth", request);
+                response=new ResponseEntity<>(HttpStatus.NO_CONTENT);
+
+        } catch (org.springframework.web.client.HttpClientErrorException exception) {
+            if (exception.getStatusCode().value() == 404)
+                return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+            if (exception.getStatusCode().value() == 400)
+                return new ResponseEntity<>(exception.getMessage(), HttpStatus.BAD_REQUEST);
         } catch (Exception e) {
             e.printStackTrace();
             return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
@@ -373,7 +469,7 @@ public class SubscribersController {
      * @return status code the {@code ResponseEntity<String>} object representing 200,500
      */
 
-    @RequestMapping(value = {"/key-auths/{keyOrId}/subscriber"}, method = RequestMethod.GET,
+    @RequestMapping(value = {"/key-auths/subscriber"}, method = RequestMethod.GET,
             produces = {MediaType.APPLICATION_JSON_VALUE})
     @Operation(summary = "Retrieve a subscriber associated with an API key by making the following request", description = "Returns a subscriber associated with an API key by making the following request", operationId = "key-auth_keyOrId")
     @ApiResponses(value = {
@@ -385,7 +481,7 @@ public class SubscribersController {
 
         try {
 
-            response = restTemplate.getForEntity(keyAuthUrl_k.replace("{key or id}", keyOrId), String.class);
+            response = restTemplate.getForEntity(keyAuthUrl_getsubscriber.replace("{key or id}", keyOrId), String.class);
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -398,22 +494,22 @@ public class SubscribersController {
      * Restrict access to a Service or a Route by adding subscribers to allowed or denied lists using arbitrary ACL groups.
      * Response status codes include 201,204,404,400,500
      * 201 status code:Created , 204 status code:No content , 500 status code:Internal Server Error ,
-     * 404 status code:Audit trail management path not found , 400 status code:Bad request
+     * 404 status code:Not found , 400 status code:Bad request
      *
      * @param subscriber  the {@code String} The username or id of the subscriber.
      * @param group       the {@code String} The arbitrary group name to associate with the subscriber.
-     * @param reference   the {@code String} Refrence number for saving changes in postgres database by audit trail management system.
+     * @param reference   the {@code String} Reference number for saving changes in postgres database by audit trail management system.
      * @param description the {@code String} description for saving changes in postgres database by audit trail management system.
      * @return status code the {@code ResponseEntity<String>} object representing 201,404,400,500
      */
 
-    @RequestMapping(value = {"/subscribers/{subscriber}/acls"}, method = RequestMethod.POST,
+    @RequestMapping(value = {"/subscribers/acls"}, method = RequestMethod.POST,
             produces = {MediaType.APPLICATION_JSON_VALUE})
     @Operation(summary = "Restrict access to a Service or a Route by adding subscribers to allowed or denied lists using arbitrary ACL groups.", description = "Access control list", operationId = "acl")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "created"),
             @ApiResponse(responseCode = "204", description = "No content"),
-            @ApiResponse(responseCode = "404", description = "Audit trail management path not found"),
+            @ApiResponse(responseCode = "404", description = "Not found"),
             @ApiResponse(responseCode = "400", description = "Bad request"),
             @ApiResponse(responseCode = "500", description = "Internal Server Error")})
     public @ResponseBody
@@ -443,35 +539,101 @@ public class SubscribersController {
     }
 
     /**
-     * Restrict access to a Service or a Route by either allowing or denying IP addresses.
+     * Restrict access to a Service or a Route by allowing IP addresses.
      * Response status codes include 201,204,404,400,500,409
      * 201 status code:Created , 204 status code:No content , 500 status code:Internal Server Error ,
-     * 404 status code:Audit trail management path not found , 400 status code:Bad request , 409 status code:Conflict
+     * 404 status code:Not found , 400 status code:Bad request , 409 status code:Conflict
      *
      * @param subscriber  the {@code String} The username or id of the subscriber.
      * @param ipWhiteList the {@code String} The ip white list or allowed ip's.
-     * @param reference   the {@code String} Refrence number for saving changes in postgres database by audit trail management system.
+     * @param ipBlackList the {@code String} The ip black list or denied ip's.
+     * @param reference   the {@code String} Reference number for saving changes in postgres database by audit trail management system.
      * @param description the {@code String} description for saving changes in postgres database by audit trail management system.
      * @return status code the {@code ResponseEntity<String>} object representing 201,404,400,500,409
      */
 
-    @RequestMapping(value = {"/subscribers/{subscriber}/ip-restriction"}, method = RequestMethod.POST,
+    @RequestMapping(value = {"/subscribers/whitelist-blacklist/ip-restriction"}, method = RequestMethod.PUT,
             produces = {MediaType.APPLICATION_JSON_VALUE})
     @Operation(summary = "Restrict access to a Service or a Route by either allowing or denying IP addresses", description = "Restrict subscriber by ip addresses", operationId = "ip-restriction")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "created"),
             @ApiResponse(responseCode = "204", description = "No content"),
-            @ApiResponse(responseCode = "404", description = "Audit trail management path not found"),
+            @ApiResponse(responseCode = "404", description = "Not found"),
             @ApiResponse(responseCode = "400", description = "Bad request"),
             @ApiResponse(responseCode = "409", description = "Conflict"),
             @ApiResponse(responseCode = "500", description = "Internal Server Error")})
     public @ResponseBody
-    ResponseEntity<String> plugins(@RequestParam String subscriber, @RequestParam String ipWhiteList, @RequestParam String reference, @RequestParam String description, HttpServletRequest request) {
+    ResponseEntity<String> plugins(@RequestParam String subscriber, @RequestParam String ipWhiteList, @RequestParam String ipBlackList, @RequestParam String reference, @RequestParam String description, HttpServletRequest request) {
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<String, Object>();
         body.add("name", "ip-restriction");
-        String[] ips = ipWhiteList.split(",");
-        for (String ip : ips)
+        String[] ipWhiteLists = ipWhiteList.split(",");
+        for (String ip : ipWhiteLists)
             body.add("config.allow", ip);
+        String[] ipBlackLists = ipBlackList.split(",");
+        for (String ip : ipBlackLists)
+            body.add("config.deny", ip);
+        ResponseEntity<String> response = null;
+        try {
+            ResponseEntity<String> getResponse = plugins(subscriber);
+            String url = plugins.replace("{CONSUMER}", subscriber);
+            String url2 =url+"/"+StringUtils.substringBetween(getResponse.getBody(),"\"id\""+":"+"\"","\""+",");
+            if(getResponse.getStatusCodeValue() == 200) {
+                restTemplate.put(url2, body);
+                subscribersChanges(reference, description, subscriber, "create_ipRestriction", request);
+
+            } else {
+                return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+            }
+
+        } catch (org.springframework.web.client.HttpClientErrorException exception) {
+            exception.printStackTrace();
+            if (exception.getStatusCode().value() == 409)
+                return new ResponseEntity<>(exception.getMessage(), HttpStatus.CONFLICT);
+            if (exception.getStatusCode().value() == 404)
+                return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+            if (exception.getStatusCode().value() == 400)
+                return new ResponseEntity<>(exception.getMessage(), HttpStatus.BAD_REQUEST);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+        return response;
+    }
+
+   /**
+     * Restrict access to a Service or a Route by denying IP addresses.
+     * Response status codes include 201,204,404,400,500,409
+     * 201 status code:Created , 204 status code:No content , 500 status code:Internal Server Error ,
+     * 404 status code:Not found , 400 status code:Bad request , 409 status code:Conflict
+     *
+     * @param subscriber  the {@code String} The username or id of the subscriber.
+     * @param ipWhiteList the {@code String} The ip white list or allowed ip's.
+     * @param ipBlackList the {@code String} The ip black list or denied ip's.
+     * @param reference   the {@code String} Reference number for saving changes in postgres database by audit trail management system.
+     * @param description the {@code String} description for saving changes in postgres database by audit trail management system.
+     * @return status code the {@code ResponseEntity<String>} object representing 201,404,400,500,409
+     */
+
+    @RequestMapping(value = {"/subscribers/whitelist-blacklist/ip-restriction"}, method = RequestMethod.POST,
+            produces = {MediaType.APPLICATION_JSON_VALUE})
+    @Operation(summary = "Restrict access to a Service or a Route by either allowing or denying IP addresses", description = "Restrict subscriber by ip addresses", operationId = "ip-restriction")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "201", description = "created"),
+            @ApiResponse(responseCode = "204", description = "No content"),
+            @ApiResponse(responseCode = "404", description = "Not found"),
+            @ApiResponse(responseCode = "400", description = "Bad request"),
+            @ApiResponse(responseCode = "409", description = "Conflict"),
+            @ApiResponse(responseCode = "500", description = "Internal Server Error")})
+    public @ResponseBody
+    ResponseEntity<String> plugins_(@RequestParam String subscriber, @RequestParam String ipWhiteList, @RequestParam String ipBlackList, @RequestParam String reference, @RequestParam String description, HttpServletRequest request) {
+        MultiValueMap<String, Object> body = new LinkedMultiValueMap<String, Object>();
+        body.add("name", "ip-restriction");
+        String[] ipWhiteLists = ipWhiteList.split(",");
+        for (String ip : ipWhiteLists)
+            body.add("config.allow", ip);
+        String[] ipBlackLists = ipBlackList.split(",");
+        for (String ip : ipBlackLists)
+            body.add("config.deny", ip);
         ResponseEntity<String> response = null;
         try {
 
@@ -499,18 +661,19 @@ public class SubscribersController {
 
     /**
      * Retrieve allowed ip list for a subscriber
-     * Response status codes include 200,500.
-     * 200 status code:Successful , 500 status code:Internal Server Error
+     * Response status codes include 200,500,204.
+     * 200 status code:Successful , 500 status code:Internal Server Error , 204 status code:No content
      *
      * @param usernameOrId the {@code String} The username or id of the subscriber.
      * @return status code the {@code ResponseEntity<String>} object representing 200,500
      */
 
-    @RequestMapping(value = {"/subscribers/{subscriber}/ip-restriction"}, method = RequestMethod.GET,
+    @RequestMapping(value = {"/subscribers/ip-restriction"}, method = RequestMethod.GET,
             produces = {MediaType.APPLICATION_JSON_VALUE})
     @Operation(summary = "Get list of all ip white list for subscriber", description = "Returns list of all ip white list for subscriber", operationId = "ip-restrictions")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Successful"),
+            @ApiResponse(responseCode = "204", description = "No content"),
             @ApiResponse(responseCode = "500", description = "Internal Server Error")})
     public @ResponseBody
     ResponseEntity<String> plugins(@RequestParam String usernameOrId) {
@@ -542,6 +705,9 @@ public class SubscribersController {
                     ipRestrictionDto.setConfig(ipConfigDto);
                     response = new ResponseEntity<>(objectMapper.writeValueAsString(ipRestrictionDto), HttpStatus.OK);
                 }
+                else if(restrictionsDto.getName().equals("rate-limiting")){
+                    response=new ResponseEntity<>(HttpStatus.NO_CONTENT);
+                }
             }
 
 
@@ -557,24 +723,24 @@ public class SubscribersController {
      * Rate limit how many HTTP requests can be made in a given period of seconds, minutes, hours.
      * Response status codes include 201,404,400,500,409
      * 201 status code:Created , 204 status code:No content , 500 status code:Internal Server Error ,
-     * 404 status code:Audit trail management path not found , 400 status code:Bad request , 409 status code:Conflict
+     * 404 status code:Not found , 400 status code:Bad request , 409 status code:Conflict
      *
      * @param subscriber  the {@code String} The username or id of the subscriber.
      * @param second      the {@code int} The number of HTTP requests that can be made per second.
      * @param minute      the {@code int} The number of HTTP requests that can be made per minute.
      * @param hour        the {@code int} The number of HTTP requests that can be made per hour.
-     * @param reference   the {@code String} Refrence number for saving changes in postgres database by audit trail management system.
+     * @param reference   the {@code String} Reference number for saving changes in postgres database by audit trail management system.
      * @param description the {@code String} description for saving changes in postgres database by audit trail management system.
      * @return status code the {@code ResponseEntity<String>} object representing 201,404,400,500
      */
 
-    @RequestMapping(value = {"/subscribers/{subscriber}/rate-limiting"}, method = RequestMethod.POST,
+    @RequestMapping(value = {"/subscribers/rate-limiting"}, method = RequestMethod.POST,
             produces = {MediaType.APPLICATION_JSON_VALUE})
     @Operation(summary = "Rate limit how many HTTP requests can be made in a given period of seconds, minutes, hours", description = "Restrict subscriber by number of requests", operationId = "rate-limit")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "created"),
             @ApiResponse(responseCode = "204", description = "No content"),
-            @ApiResponse(responseCode = "404", description = "Audit trail management path not found"),
+            @ApiResponse(responseCode = "404", description = "Not found"),
             @ApiResponse(responseCode = "400", description = "Bad request"),
             @ApiResponse(responseCode = "409", description = "Conflict"),
             @ApiResponse(responseCode = "500", description = "Internal Server Error")})
@@ -612,18 +778,19 @@ public class SubscribersController {
 
     /**
      * Retrieve allowed ip list for a subscriber
-     * Response status codes include 200,500.
-     * 200 status code:Successful , 500 status code:Internal Server Error
+     * Response status codes include 200,500,204.
+     * 200 status code:Successful , 500 status code:Internal Server Error , 204 status code:No content
      *
      * @param usernameOrId the {@code String} The username or id of the subscriber.
      * @return status code the {@code ResponseEntity<String>} object representing 200,500
      */
 
-    @RequestMapping(value = {"/subscribers/{subscriber}/rate-limiting"}, method = RequestMethod.GET,
+    @RequestMapping(value = {"/subscribers/rate-limiting"}, method = RequestMethod.GET,
             produces = {MediaType.APPLICATION_JSON_VALUE})
     @Operation(summary = "Get rate limiting for subscriber", description = "Returns rate limiting for subscriber", operationId = "rate-limiting")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Successful"),
+            @ApiResponse(responseCode = "204", description = "No content"),
             @ApiResponse(responseCode = "500", description = "Internal Server Error")})
     public @ResponseBody
     ResponseEntity<String> rateLimiting(@RequestParam String usernameOrId) {
@@ -654,6 +821,10 @@ public class SubscribersController {
                     rateLimitingDto.setConfig(rateConfigDto);
                     response = new ResponseEntity<>(objectMapper.writeValueAsString(rateLimitingDto), HttpStatus.OK);
                 }
+                else if(restrictionsDto.getName().equals("ip-restriction")){
+                    response=new ResponseEntity<>(HttpStatus.NO_CONTENT);
+                }
+
             }
 
         } catch (Exception e) {
